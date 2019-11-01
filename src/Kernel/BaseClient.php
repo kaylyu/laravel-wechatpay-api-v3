@@ -174,6 +174,8 @@ class BaseClient
     {
         // log
         $this->pushMiddleware($this->logMiddleware(), 'log');
+        //引入middleware
+        $this->pushMiddleware($this->app->wechatpayMiddleware(), 'wechatpay');
     }
 
     /**

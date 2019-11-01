@@ -6,7 +6,10 @@ use Kaylyu\Wechatpay\ApiV3\Kernel\Providers\ConfigServiceProvider;
 use Kaylyu\Wechatpay\ApiV3\Kernel\Providers\HttpClientServiceProvider;
 use Kaylyu\Wechatpay\ApiV3\Kernel\Providers\LogServiceProvider;
 use Kaylyu\Wechatpay\ApiV3\Kernel\Providers\RequestServiceProvider;
+use Kaylyu\Wechatpay\ApiV3\Kernel\Validators\NoopValidator;
 use Pimple\Container;
+use WechatPay\GuzzleMiddleware\Util\PemUtil;
+use WechatPay\GuzzleMiddleware\WechatPayMiddleware;
 
 /**
  * Class ServiceContainer.
@@ -168,5 +171,45 @@ class ServiceContainer extends Container
         foreach ($providers as $provider) {
             parent::register(new $provider());
         }
+    }
+
+    /**
+     * 构造一个WechatPayMiddleware
+     * @author kaylv <kaylv@dayuw.com>
+     * @return WechatPayMiddleware
+     */
+    public function wechatpayMiddleware(){
+        // 商户配置
+        $merchantId = $this->getMerchantId();
+        $merchantSerialNumber = $this->getMerchantSerialNumber();
+        $merchantPrivateKey = PemUtil::loadPrivateKey($this->getMerchantPrivateKey());
+        $wechatpayCertificate = PemUtil::loadCertificate($this->getWechatpayCertificate());
+
+        // 构造一个WechatPayMiddleware
+        return WechatPayMiddleware::builder()
+            ->withMerchant($merchantId, $merchantSerialNumber, $merchantPrivateKey)
+            ->withWechatPay([ $wechatpayCertificate ]) // 可传入多个微信支付平台证书，参数类型为array
+            ->build();
+    }
+
+    /**
+     * 下载平台证书
+     * 使用WechatPayMiddlewareBuilder需要调用withWechatpay设置微信支付平台证书，而平台证书又只能通过调用获取平台证书接口下载。
+     * 为了解开"死循环"，你可以在第一次下载平台证书时，按照下述方法临时"跳过”应答签名的验证
+     *
+     * @author kaylv <kaylv@dayuw.com>
+     * @return WechatPayMiddleware
+     */
+    public function wechatpayDownloadMiddleware(){
+        // 商户配置
+        $merchantId = $this->getMerchantId();
+        $merchantSerialNumber = $this->getMerchantSerialNumber();
+        $merchantPrivateKey = PemUtil::loadPrivateKey($this->getMerchantPrivateKey());
+
+        // 构造一个WechatPayMiddleware
+        return $wechatpayMiddleware = WechatPayMiddleware::builder()
+            ->withMerchant($merchantId, $merchantSerialNumber, $merchantPrivateKey)
+            ->withValidator(new NoopValidator) // NOTE: 设置一个空的应答签名验证器，**不要**用在业务请求
+            ->build();
     }
 }
