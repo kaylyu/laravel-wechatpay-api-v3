@@ -1,4 +1,4 @@
-# Lvmama
+# laravel-wechatpay-api-v3
 
 ## Installation
 
